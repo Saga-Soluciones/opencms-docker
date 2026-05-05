@@ -1,0 +1,72 @@
+name: Publish to Docker Hub
+
+on:
+  push:
+    tags:
+      - '*-tomcat'
+
+jobs:
+  resolve-version:
+    runs-on: ubuntu-latest
+    outputs:
+      opencms_version: ${{ steps.parse.outputs.opencms_version }}
+      opencms_tag: ${{ steps.parse.outputs.opencms_tag }}
+      base_image: ${{ steps.parse.outputs.base_image }}
+      image_dir: ${{ steps.parse.outputs.image_dir }}
+      docker_tags: ${{ steps.parse.outputs.docker_tags }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Parse version from tag and look up versions.yaml
+        id: parse
+        run: |
+          VERSION="${GITHUB_REF_NAME%-tomcat}"
+          ENTRY=$(yq ".versions[] | select(.opencms == \"$VERSION\")" versions.yaml -o=json)
+          if [ -z "$ENTRY" ]; then
+            echo "ERROR: Version $VERSION not found in versions.yaml"
+            yq '.versions[].opencms' versions.yaml
+            exit 1
+          fi
+          echo "opencms_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "opencms_tag=$(echo "$ENTRY" | jq -r .opencms_tag)" >> $GITHUB_OUTPUT
+          echo "base_image=$(echo "$ENTRY" | jq -r .base_image)" >> $GITHUB_OUTPUT
+          echo "image_dir=$(echo "$ENTRY" | jq -r .image_dir)" >> $GITHUB_OUTPUT
+          # docker_tags as comma-separated for docker/metadata-action
+          TAGS=$(echo "$ENTRY" | jq -r '[.docker_tags[] | "sagasoluciones/opencms-tomcat:" + .] | join("\n")')
+          echo "docker_tags<<EOF" >> $GITHUB_OUTPUT
+          echo "$TAGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: resolve-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ needs.resolve-version.outputs.image_dir }}
+          push: true
+          build-args: |
+            SERVLET_CONTAINER=tomcat
+            BASE_IMAGE=${{ needs.resolve-version.outputs.base_image }}
+            OPENCMS_VERSION=${{ needs.resolve-version.outputs.opencms_version }}
+            OPENCMS_VERSION_TAG=${{ needs.resolve-version.outputs.opencms_tag }}
+          tags: ${{ needs.resolve-version.outputs.docker_tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
