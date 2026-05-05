@@ -17,21 +17,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
 ENV CONTAINER_BASE=/container \
     TOMCAT_HOME=/usr/local/tomcat \
     JETTY_HOME=/usr/local/jetty \
-    BASH_ENV=/root/common.sh \
-    ARTIFACTS_FOLDER=/artifacts/ \
-    CONFIG_FILE=/config/setup.properties \
-    OPENCMS_URL=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_VERSION_TAG}/opencms-${OPENCMS_VERSION}-distribution.zip \
-    UPDATE_CONFIG_FILES="WEB-INF/web.xml WEB-INF/opencms.tld WEB-INF/config/opencms-search.xml WEB-INF/config/opencms-system.xml WEB-INF/config/opencms-vfs.xml WEB-INF/config/opencms-workplace.xml WEB-INF/solr/configsets/default/conf/solrconfig.xml WEB-INF/solr/spellcheck/conf/solrconfig.xml"
+    BASH_ENV=/root/common.sh
 
 ENV TOMCAT_LIB=${TOMCAT_HOME}/lib \
     JETTY_LIB=${JETTY_HOME}/lib \
     WEBAPPS_HOME=${CONTAINER_BASE}/webapps \
-    OPENCMS_HOME=${CONTAINER_BASE}/webapps/ROOT
-
-ENV OPENCMS_COMPONENTS=workplace,demo \
-    OPENCMS_USER=opencms \
-    OPENCMS_UID=998 \
-    OPENCMS_GID=998 \
+    OPENCMS_HOME=${CONTAINER_BASE}/webapps/ROOT \
+    ARTIFACTS_FOLDER=/artifacts/ \
+    CONFIG_FILE=/config/setup.properties \
+    OPENCMS_URL=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_VERSION_TAG}/opencms-${OPENCMS_VERSION}-distribution.zip \
+    OPENCMS_COMPONENTS=workplace,demo \
+    UPDATE_CONFIG_FILES="WEB-INF/web.xml WEB-INF/opencms.tld WEB-INF/config/opencms-search.xml WEB-INF/config/opencms-system.xml WEB-INF/config/opencms-vfs.xml WEB-INF/config/opencms-workplace.xml WEB-INF/solr/configsets/default/conf/solrconfig.xml WEB-INF/solr/spellcheck/conf/solrconfig.xml" \
     TIME_ZONE=Europe/Berlin \
     JETTY_OPTS="-Xmx2g" \
     TOMCAT_OPTS= \
@@ -45,20 +41,15 @@ ENV OPENCMS_COMPONENTS=workplace,demo \
     WEBRESOURCES_CACHE_SIZE=200000 \
     DEBUG=false
 
-ENV RUN_AS_USER=${OPENCMS_USER}
-
 RUN \
     echo "Update the apt packet repos" && \
     apt-get update && \
     echo "Install utils" && \
-    apt-get install -yq --no-install-recommends procps wget unzip xsltproc netcat-openbsd gosu && \
+    apt-get install -yq --no-install-recommends procps wget unzip xsltproc netcat-openbsd && \
     echo "Clean up apt" && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get autoremove && \
-    apt-get clean && \
-    echo "Create user opencms" && \
-    groupadd --gid ${OPENCMS_GID} opencms && \
-    useradd --uid ${OPENCMS_UID} --gid ${OPENCMS_GID} -m opencms
+    apt-get clean
 
 # Create the setup configuration file
 COPY resources /
