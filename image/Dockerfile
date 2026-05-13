@@ -1,18 +1,15 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=jetty:12-jdk25
 FROM $BASE_IMAGE
 LABEL org.opencontainers.image.authors="Alkacon Software GmbH & Co. KG"
 USER root
-ARG SERVLET_CONTAINER
-ARG OPENCMS_VERSION
-ARG OPENCMS_VERSION_TAG
-
-RUN test -n "$SERVLET_CONTAINER" && test -n "$OPENCMS_VERSION" && test -n "$OPENCMS_VERSION_TAG" \
-    || { echo "ERROR: BASE_IMAGE, SERVLET_CONTAINER, OPENCMS_VERSION and OPENCMS_VERSION_TAG build args are required"; exit 1; }
-
+ARG SERVLET_CONTAINER=jetty
 ENV SERVLET_CONTAINER=${SERVLET_CONTAINER}
+
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TMPDIR=/tmp
+
+ARG OPENCMS_URL=https://github.com/alkacon/opencms-core/releases/download/build_21_0_1/opencms-21.0.1-distribution.zip
 
 ENV CONTAINER_BASE=/container \
     TOMCAT_HOME=/usr/local/tomcat \
@@ -20,7 +17,7 @@ ENV CONTAINER_BASE=/container \
     BASH_ENV=/root/common.sh \
     ARTIFACTS_FOLDER=/artifacts/ \
     CONFIG_FILE=/config/setup.properties \
-    OPENCMS_URL=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_VERSION_TAG}/opencms-${OPENCMS_VERSION}-distribution.zip \
+    OPENCMS_URL=${OPENCMS_URL} \
     UPDATE_CONFIG_FILES="WEB-INF/web.xml WEB-INF/opencms.tld WEB-INF/config/opencms-search.xml WEB-INF/config/opencms-system.xml WEB-INF/config/opencms-vfs.xml WEB-INF/config/opencms-workplace.xml WEB-INF/solr/configsets/default/conf/solrconfig.xml WEB-INF/solr/spellcheck/conf/solrconfig.xml"
 
 ENV TOMCAT_LIB=${TOMCAT_HOME}/lib \
@@ -28,10 +25,15 @@ ENV TOMCAT_LIB=${TOMCAT_HOME}/lib \
     WEBAPPS_HOME=${CONTAINER_BASE}/webapps \
     OPENCMS_HOME=${CONTAINER_BASE}/webapps/ROOT
 
+ARG OPENCMS_UID=998
+ARG OPENCMS_GID=998
+ARG HOST_UID=1000
+ARG HOST_GID=1000
+
 ENV OPENCMS_COMPONENTS=workplace,demo \
     OPENCMS_USER=opencms \
-    OPENCMS_UID=998 \
-    OPENCMS_GID=998 \
+    OPENCMS_UID=${OPENCMS_UID} \
+    OPENCMS_GID=${OPENCMS_GID} \
     TIME_ZONE=Europe/Berlin \
     JETTY_OPTS="-Xmx2g" \
     TOMCAT_OPTS= \
@@ -58,7 +60,13 @@ RUN \
     apt-get clean && \
     echo "Create user opencms" && \
     groupadd --gid ${OPENCMS_GID} opencms && \
-    useradd --uid ${OPENCMS_UID} --gid ${OPENCMS_GID} -m opencms
+    useradd --uid ${OPENCMS_UID} --gid ${OPENCMS_GID} -m opencms && \
+    echo "Ensure ubuntu user exists with host UID/GID for bind mount compatibility" && \
+    if getent passwd ubuntu > /dev/null 2>&1; then \
+        usermod -u ${HOST_UID} ubuntu && groupmod -g ${HOST_GID} ubuntu; \
+    else \
+        groupadd --gid ${HOST_GID} ubuntu && useradd --uid ${HOST_UID} --gid ${HOST_GID} -m ubuntu; \
+    fi
 
 # Create the setup configuration file
 COPY resources /

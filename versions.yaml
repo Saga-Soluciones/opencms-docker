@@ -2,7 +2,7 @@ versions:
   - opencms: "21.0.1"
     opencms_tag: "build_21_0_1"
     base_image: "tomcat:9.0-jdk21"
-    image_dir: "image-21"
+    image_dir: "image"
     docker_tags:
       - "21.0.1"
       - "latest"
@@ -10,6 +10,13 @@ versions:
   - opencms: "20.0"
     opencms_tag: "build_20_0_0"
     base_image: "tomcat:9.0-jdk21"
-    image_dir: "image-20"
+    image_dir: "image"
     docker_tags:
       - "20.0"
+
+  - opencms: "19.0"
+    opencms_tag: "build_19_0_0"
+    base_image: "tomcat:9.0-jdk21"
+    image_dir: "image"
+    docker_tags:
+      - "19.0"

@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       opencms_version: ${{ steps.parse.outputs.opencms_version }}
-      opencms_tag: ${{ steps.parse.outputs.opencms_tag }}
+      opencms_url: ${{ steps.parse.outputs.opencms_url }}
       base_image: ${{ steps.parse.outputs.base_image }}
       image_dir: ${{ steps.parse.outputs.image_dir }}
       docker_tags: ${{ steps.parse.outputs.docker_tags }}
@@ -32,8 +32,9 @@ jobs:
             yq '.versions[].opencms' versions.yaml
             exit 1
           fi
+          OPENCMS_TAG=$(echo "$ENTRY" | jq -r .opencms_tag)
           echo "opencms_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "opencms_tag=$(echo "$ENTRY" | jq -r .opencms_tag)" >> $GITHUB_OUTPUT
+          echo "opencms_url=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_TAG}/opencms-${VERSION}-distribution.zip" >> $GITHUB_OUTPUT
           echo "base_image=$(echo "$ENTRY" | jq -r .base_image)" >> $GITHUB_OUTPUT
           echo "image_dir=$(echo "$ENTRY" | jq -r .image_dir)" >> $GITHUB_OUTPUT
           # docker_tags as comma-separated for docker/metadata-action
@@ -65,8 +66,7 @@ jobs:
           build-args: |
             SERVLET_CONTAINER=tomcat
             BASE_IMAGE=${{ needs.resolve-version.outputs.base_image }}
-            OPENCMS_VERSION=${{ needs.resolve-version.outputs.opencms_version }}
-            OPENCMS_VERSION_TAG=${{ needs.resolve-version.outputs.opencms_tag }}
+            OPENCMS_URL=${{ needs.resolve-version.outputs.opencms_url }}
           tags: ${{ needs.resolve-version.outputs.docker_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

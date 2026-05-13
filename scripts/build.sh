@@ -21,17 +21,18 @@ fi
 BASE_IMAGE=$(echo "$ENTRY" | jq -r .base_image)
 OPENCMS_TAG=$(echo "$ENTRY" | jq -r .opencms_tag)
 IMAGE_DIR=$(echo "$ENTRY" | jq -r .image_dir)
+OPENCMS_URL="https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_TAG}/opencms-${VERSION}-distribution.zip"
 
 echo "Building sagasoluciones/opencms-tomcat:${VERSION}-dev"
 echo "  Base image : $BASE_IMAGE"
 echo "  OpenCms tag: $OPENCMS_TAG"
+echo "  OpenCms URL: $OPENCMS_URL"
 echo "  Context    : $IMAGE_DIR/"
 
 docker build \
     --build-arg SERVLET_CONTAINER=tomcat \
     --build-arg BASE_IMAGE="$BASE_IMAGE" \
-    --build-arg OPENCMS_VERSION="$VERSION" \
-    --build-arg OPENCMS_VERSION_TAG="$OPENCMS_TAG" \
+    --build-arg OPENCMS_URL="$OPENCMS_URL" \
     -t "sagasoluciones/opencms-tomcat:${VERSION}-dev" \
     "$REPO_ROOT/$IMAGE_DIR"
 

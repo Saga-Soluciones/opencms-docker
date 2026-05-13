@@ -12,12 +12,11 @@ services:
     image: sagasoluciones/opencms-tomcat:${OPENCMS_VERSION:-21.0.1}
     container_name: opencms
     build:
-      context: ./image-21
+      context: ./image
       args:
         SERVLET_CONTAINER: tomcat
         BASE_IMAGE: tomcat:9.0-jdk21
-        OPENCMS_VERSION: ${OPENCMS_VERSION:-21.0.1}
-        OPENCMS_VERSION_TAG: ${OPENCMS_VERSION_TAG:-build_21_0_1}
+        OPENCMS_URL: ${OPENCMS_URL:-https://github.com/alkacon/opencms-core/releases/download/build_21_0_1/opencms-21.0.1-distribution.zip}
     init: true
     restart: always
     depends_on: [ "mariadb" ]
