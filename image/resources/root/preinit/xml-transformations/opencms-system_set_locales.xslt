@@ -3,6 +3,7 @@
     <xsl:output method="xml"
         doctype-system="http://www.opencms.org/dtd/6.0/opencms-system.dtd"
         indent="yes" />
+    <xsl:strip-space elements="*" />
 
     <xsl:template match="@* | node()">
         <xsl:copy>
