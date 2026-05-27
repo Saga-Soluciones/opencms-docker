@@ -1,3 +1,4 @@
+#!/bin/bash
 # common shell functions for use in other scripts
 # (Included via BASH_ENV for noninteractive bash shells and is sourced in .bashrc for interactive ones)
 
