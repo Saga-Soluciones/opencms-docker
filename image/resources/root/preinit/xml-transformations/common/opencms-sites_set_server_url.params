@@ -1,0 +1,1 @@
+--stringparam server_url ${OPENCMS_SERVER_URL:-http://localhost:8080}

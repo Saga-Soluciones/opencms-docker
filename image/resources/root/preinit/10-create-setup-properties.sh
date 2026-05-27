@@ -12,7 +12,17 @@ else
     DB_PWD=$(get_secret DB_PASSWD_FILE DB_PASSWD)
     DB_DB=$DB_NAME
     DB_PRODUCT=mysql
-    DB_URL="jdbc:mysql://${DB_HOST}:3306/"
+
+    # OpenCms 10.x needs the full URL (DB name + connection params) embedded in
+    # db.connection.url because its setup tool uses the value verbatim.
+    # OpenCms 19+ expects a bare URL ending with a trailing slash; the setup
+    # tool appends db.name and its own params. Mixing the two formats yields a
+    # malformed JDBC URL on the 19+ branch (e.g. "?p1=v1?p2=v2").
+    if [[ "${OPENCMS_VERSION}" == 10.* ]]; then
+        DB_URL="jdbc:mysql://${DB_HOST}:3306/${DB_DB}?useSSL=false&allowPublicKeyRetrieval=true"
+    else
+        DB_URL="jdbc:mysql://${DB_HOST}:3306/"
+    fi
     DB_DRIVER=org.gjt.mm.mysql.Driver
 
     # Create setup.properties

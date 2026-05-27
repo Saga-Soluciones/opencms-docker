@@ -1,0 +1,33 @@
+services:
+  mariadb:
+    image: mariadb:10.5
+    container_name: mariadb
+    init: true
+    restart: always
+    volumes:
+      - ~/dockermount/opencms-10.5.4-mysql:/var/lib/mysql
+    environment:
+      - "MYSQL_ROOT_PASSWORD=secretDBpassword"
+  opencms:
+    image: sagasoluciones/opencms-tomcat:10.5.4-dev
+    container_name: opencms
+    build:
+      context: ../../image
+      args:
+        SERVLET_CONTAINER: tomcat
+        BASE_IMAGE: tomcat:8.5-jdk8
+        OPENCMS_URL: https://github.com/alkacon/opencms-core/releases/download/build_10_5_4/opencms-10.5.4-distribution.zip
+        OPENCMS_VERSION: "10.5.4"
+    init: true
+    restart: always
+    depends_on: [ "mariadb" ]
+    links:
+      - "mariadb:mysql"
+    ports:
+      - "80:8080"
+    volumes:
+      - ~/dockermount/opencms-10.5.4-webapps:/container/webapps
+    command: [ "/root/wait-for.sh", "mysql:3306", "-t", "30", "--", "/root/opencms-run.sh" ]
+    environment:
+      - "DB_PASSWD=secretDBpassword"
+      - "OPENCMS_COMPONENTS=workplace"
