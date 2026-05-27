@@ -6,14 +6,33 @@ on:
       - '*-tomcat'
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: image/Dockerfile
+          failure-threshold: error
+
+      - name: Lint shell scripts (shellcheck)
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          scandir: image/resources/root
+
   resolve-version:
     runs-on: ubuntu-latest
     outputs:
       opencms_version: ${{ steps.parse.outputs.opencms_version }}
       opencms_url: ${{ steps.parse.outputs.opencms_url }}
+      opencms_sha256: ${{ steps.parse.outputs.opencms_sha256 }}
       base_image: ${{ steps.parse.outputs.base_image }}
       image_dir: ${{ steps.parse.outputs.image_dir }}
       docker_tags: ${{ steps.parse.outputs.docker_tags }}
+      primary_tag: ${{ steps.parse.outputs.primary_tag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,22 +51,31 @@ jobs:
             yq '.versions[].opencms' versions.yaml
             exit 1
           fi
+          DEFAULT_IMAGE_DIR=$(yq '.defaults.image_dir // "image"' versions.yaml)
           OPENCMS_TAG=$(echo "$ENTRY" | jq -r .opencms_tag)
-          echo "opencms_version=$VERSION" >> $GITHUB_OUTPUT
-          echo "opencms_url=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_TAG}/opencms-${VERSION}-distribution.zip" >> $GITHUB_OUTPUT
-          echo "base_image=$(echo "$ENTRY" | jq -r .base_image)" >> $GITHUB_OUTPUT
-          echo "image_dir=$(echo "$ENTRY" | jq -r .image_dir)" >> $GITHUB_OUTPUT
+          IMAGE_DIR=$(echo "$ENTRY" | jq -r --arg d "$DEFAULT_IMAGE_DIR" '.image_dir // $d')
+          echo "opencms_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "opencms_url=https://github.com/alkacon/opencms-core/releases/download/${OPENCMS_TAG}/opencms-${VERSION}-distribution.zip" >> "$GITHUB_OUTPUT"
+          echo "opencms_sha256=$(echo "$ENTRY" | jq -r '.opencms_sha256 // ""')" >> "$GITHUB_OUTPUT"
+          echo "base_image=$(echo "$ENTRY" | jq -r .base_image)" >> "$GITHUB_OUTPUT"
+          echo "image_dir=$IMAGE_DIR" >> "$GITHUB_OUTPUT"
           # docker_tags as comma-separated for docker/metadata-action
           TAGS=$(echo "$ENTRY" | jq -r '[.docker_tags[] | "sagasoluciones/opencms-tomcat:" + .] | join("\n")')
-          echo "docker_tags<<EOF" >> $GITHUB_OUTPUT
-          echo "$TAGS" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "docker_tags<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$TAGS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          # First tag, used by scan + smoke jobs
+          PRIMARY=$(echo "$ENTRY" | jq -r '"sagasoluciones/opencms-tomcat:" + .docker_tags[0]')
+          echo "primary_tag=$PRIMARY" >> "$GITHUB_OUTPUT"
 
   build-and-push:
-    needs: resolve-version
+    needs: [resolve-version, lint]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -58,15 +86,70 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push (multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: ./${{ needs.resolve-version.outputs.image_dir }}
           push: true
+          platforms: linux/amd64,linux/arm64
           build-args: |
             SERVLET_CONTAINER=tomcat
             BASE_IMAGE=${{ needs.resolve-version.outputs.base_image }}
             OPENCMS_URL=${{ needs.resolve-version.outputs.opencms_url }}
+            OPENCMS_VERSION=${{ needs.resolve-version.outputs.opencms_version }}
+            OPENCMS_SHA256=${{ needs.resolve-version.outputs.opencms_sha256 }}
           tags: ${{ needs.resolve-version.outputs.docker_tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  scan:
+    needs: [resolve-version, build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ needs.resolve-version.outputs.primary_tag }}
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+
+  smoke-test:
+    needs: [resolve-version, build-and-push]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull just-published image
+        run: docker pull ${{ needs.resolve-version.outputs.primary_tag }}
+
+      - name: Launch compose stack for ${{ needs.resolve-version.outputs.opencms_version }}
+        run: |
+          COMPOSE_FILE="compose/${{ needs.resolve-version.outputs.opencms_version }}/docker-compose.yml"
+          if [ ! -f "$COMPOSE_FILE" ]; then
+            echo "No compose file for ${{ needs.resolve-version.outputs.opencms_version }} — skipping smoke test"
+            exit 0
+          fi
+          docker compose -f "$COMPOSE_FILE" up -d
+
+      - name: Wait for OpenCms login endpoint
+        run: |
+          COMPOSE_FILE="compose/${{ needs.resolve-version.outputs.opencms_version }}/docker-compose.yml"
+          [ -f "$COMPOSE_FILE" ] || exit 0
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://localhost/opencms/system/login; then
+              echo "OpenCms responded on attempt $i"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "OpenCms did not respond within 600s"
+          docker compose -f "$COMPOSE_FILE" logs opencms | tail -200
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: |
+          COMPOSE_FILE="compose/${{ needs.resolve-version.outputs.opencms_version }}/docker-compose.yml"
+          [ -f "$COMPOSE_FILE" ] && docker compose -f "$COMPOSE_FILE" down -v || true

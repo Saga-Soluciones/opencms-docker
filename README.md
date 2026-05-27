@@ -4,33 +4,24 @@
   </a>
 </p>
 
-# Official OpenCms Docker Image
+# OpenCms Docker Image (SAGA fork)
 
-Welcome to the official OpenCms Docker image maintained by [Alkacon](https://github.com/alkacon/).
+Tomcat-based Docker image for [OpenCms](http://opencms.org/), maintained by SAGA Soluciones as a fork of the [official Alkacon image](https://github.com/alkacon/opencms-docker).
 
-Here you find a Docker Compose setup with a ready to use OpenCms installation including Jetty and MariaDB.
-
-OpenCms can be used with other databases as described below.
+This fork publishes a unified `image/` build context driven by [`versions.yaml`](./versions.yaml), supporting OpenCms 19.0 → 21.0.1 on `tomcat:9.0-jdk21` and legacy OpenCms 10.5.4 on `tomcat:8.5-jdk8`.
 
 ## Available tags
 
-* [latest, 21.0.1](https://github.com/alkacon/opencms-docker/blob/21.0.1/image/Dockerfile)
-* [21.0](https://github.com/alkacon/opencms-docker/blob/21.0/image/Dockerfile)
-* [20.1](https://github.com/alkacon/opencms-docker/blob/20.1/image/Dockerfile)
-* [20.0](https://github.com/alkacon/opencms-docker/blob/20.0/image/Dockerfile)
-* [19.0](https://github.com/alkacon/opencms-docker/blob/19.0/image/Dockerfile)
-* [18.0](https://github.com/alkacon/opencms-docker/blob/18.0/image/Dockerfile)
-* [17.0](https://github.com/alkacon/opencms-docker/blob/17.0/image/Dockerfile)
-* [16.0](https://github.com/alkacon/opencms-docker/blob/16.0/image/Dockerfile)
-* [15.0](https://github.com/alkacon/opencms-docker/blob/15.0/image/Dockerfile)
-* [14.0](https://github.com/alkacon/opencms-docker/blob/14.0/image/Dockerfile)
-* [13.0](https://github.com/alkacon/opencms-docker/blob/13.0/image/Dockerfile)
-* [12.0](https://github.com/alkacon/opencms-docker/blob/12.0/image/Dockerfile)
-* [11.0.2](https://github.com/alkacon/opencms-docker/blob/11.0.2/image/Dockerfile)
-* [11.0.1](https://github.com/alkacon/opencms-docker/blob/11.0.1/image/Dockerfile)
-* [11.0.0](https://github.com/alkacon/opencms-docker/blob/11.0.0/image/Dockerfile)
+Published as `sagasoluciones/opencms-tomcat:<tag>` on Docker Hub. Source of truth: [`versions.yaml`](./versions.yaml).
 
-Images for older OpenCms versions are also available, see [here](https://github.com/alkacon/opencms-docker/blob/pre_11_images/README.md).
+| Tag | OpenCms | Base image | Notes |
+|---|---|---|---|
+| `latest`, `21.0.1` | 21.0.1 | `tomcat:9.0-jdk21` | |
+| `20.0` | 20.0 | `tomcat:9.0-jdk21` | |
+| `19.0` | 19.0 | `tomcat:9.0-jdk21` | |
+| `10.5.4` | 10.5.4 | `tomcat:8.5-jdk8` | legacy; see section below |
+
+For OpenCms versions older than 10.5.4, see the original [`pre_11_images`](https://github.com/alkacon/opencms-docker/blob/pre_11_images/README.md) branch of the upstream repo.
 
 ## How to use this image
 
@@ -50,7 +41,7 @@ services:
         environment:
             - "MYSQL_ROOT_PASSWORD=secretDBpassword"
     opencms:
-        image: alkacon/opencms-docker:21.0.1
+        image: sagasoluciones/opencms-tomcat:21.0.1
         container_name: opencms
         init: true
         restart: always
@@ -120,7 +111,7 @@ Enter the target version of the OpenCms image in your docker-compose.yml file.
 
 ```
     opencms:
-        image: alkacon/opencms-docker:21.0.1
+        image: sagasoluciones/opencms-tomcat:21.0.1
 ```
 
 Navigate to the folder with the docker-compose.yml file and execute `docker-compose up -d`.
@@ -147,11 +138,67 @@ Note: when using a custom configuration file, the environment variables `DB_HOST
 
 ## Building the image
 
-Since the image is available on Docker Hub, you do not need to build it yourself. If you want to build it anyway, here's how to do it:
+Published images are available on Docker Hub (`sagasoluciones/opencms-tomcat:<tag>`). To build locally:
 
-Download the [opencms-docker](https://github.com/alkacon/opencms-docker) repository.
+```bash
+# Requires yq + jq on PATH
+./scripts/build.sh 21.0.1       # builds sagasoluciones/opencms-tomcat:21.0.1-dev
+./scripts/build.sh 10.5.4       # builds the legacy OpenCms 10.5.4 image
+```
 
-Go to the repository's main folder and type `docker compose build opencms`.
+`scripts/build.sh` reads [`versions.yaml`](./versions.yaml) and passes the correct base image, OpenCms distribution URL, SHA256 digest and `OPENCMS_VERSION` to the Docker build. The `-dev` suffix marks images as local only — Docker Hub publication happens via the `<version>-tomcat` git tag (see [`.github/workflows/publish.yml`](./.github/workflows/publish.yml)).
+
+The top-level `docker-compose.yml` is provided as a quick-start example for OpenCms 21.0.1 against MariaDB. For version-pinned compose stacks, see [`compose/<version>/`](./compose/).
+
+## OpenCms 10.5.4 (Legacy)
+
+### What's included
+
+All features of the unified image apply:
+- Runtime setup via `CmsAutoSetup` against an external MariaDB or PostgreSQL database
+- XSLT configuration pipeline (locale, timezone, mail, server URL)
+- Hash-tracked project-config drop-in overrides (`/opt/opencms-project-config/`)
+- Optional module zip seeding at first boot (`/opt/opencms-modules/*.zip`)
+- Secrets via `*_FILE` env vars (`ADMIN_PASSWD_FILE`, `DB_PASSWD_FILE`)
+- gosu privilege drop (runs as `opencms` user uid 998)
+
+### Differences from OpenCms 19+
+
+| | 10.5.4 | 19 / 20 / 21 |
+|---|---|---|
+| Java | 8 (JDK 8) | 21 |
+| Tomcat | 8.5 | 9.0 |
+| Apollo / Mercury templates | Not included | Not applicable (19+) |
+| JSONAPI module | Not available | Optional via `JSONAPI=true` env |
+| Default components | `workplace` | `workplace,demo` |
+| Root URL (`/`) | 404 until a site is created | Demo site (if components include `demo`) |
+| Module templates | Classic OpenCms workplace template | — |
+
+### Quick start
+
+```bash
+# Build the image (requires yq + jq)
+./scripts/build.sh 10.5.4
+
+# Start with MariaDB
+docker compose -f compose/10.5.4/docker-compose.yml up
+```
+
+Workplace is available at `http://localhost/opencms/system/login` (default password: `admin`).
+
+### Git integration
+
+To use the Alkacon `module-checkin` git workflow (same as UPO/IBJOVE projects):
+1. Copy the `init-env.sh` template from an existing project (e.g., `IBJOVE-Web-Reservas`)
+2. Set `OPENCMS_VERSION=10.5.4` in the generated `.env`
+3. Mount your repo and `~/.ssh` as documented in that project's `README.md`
+
+OpenCms 10.5.4 ships `WEB-INF/git-scripts/` (module `org.opencms.module.git` introduced in 10.5.0).
+
+### Known limitations
+- `tomcat:8.5-jdk8` is an archived image (Tomcat 8.5 EOL 2024-03-31). Pin to a specific digest for long-term reproducibility.
+- After fresh install with `OPENCMS_COMPONENTS=workplace`, `http://localhost/` returns 404 — create a site via Workplace → Administration → Sites.
+- No upgrade path from 10.5.4 to 11+ within this image; treat them as separate installations.
 
 ## License
 

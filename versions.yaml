@@ -1,22 +1,40 @@
+# Single source of truth for image build matrix.
+# Fields per entry:
+#   opencms        — semantic version published on Docker Hub
+#   opencms_tag    — git tag in alkacon/opencms-core releases
+#   base_image     — servlet container base, digest-pinned for reproducibility
+#   opencms_sha256 — SHA256 of opencms-<version>-distribution.zip
+#   image_dir      — build context (optional, defaults to "image")
+#   docker_tags    — list of tags to push under sagasoluciones/opencms-tomcat
+defaults:
+  image_dir: "image"
+
 versions:
   - opencms: "21.0.1"
     opencms_tag: "build_21_0_1"
-    base_image: "tomcat:9.0-jdk21"
-    image_dir: "image"
+    base_image: "tomcat:9.0-jdk21@sha256:a412e116748a261c8c192daa0f66ff9153c03727475d564319279a94483cf59a"
+    opencms_sha256: "b6d5c799556a52b4a414c979766680bf7a5a77cb8214fb013dbc14aaa44c8419"
     docker_tags:
       - "21.0.1"
       - "latest"
 
   - opencms: "20.0"
     opencms_tag: "build_20_0_0"
-    base_image: "tomcat:9.0-jdk21"
-    image_dir: "image"
+    base_image: "tomcat:9.0-jdk21@sha256:a412e116748a261c8c192daa0f66ff9153c03727475d564319279a94483cf59a"
+    opencms_sha256: "b304c760dd83038511a9c5826230e07e8b85408c7f9b2ec2387dffb76d64acb1"
     docker_tags:
       - "20.0"
 
   - opencms: "19.0"
     opencms_tag: "build_19_0_0"
-    base_image: "tomcat:9.0-jdk21"
-    image_dir: "image"
+    base_image: "tomcat:9.0-jdk21@sha256:a412e116748a261c8c192daa0f66ff9153c03727475d564319279a94483cf59a"
+    opencms_sha256: "9c0c633330b679382656f66f074ece0dcbcecfc6caf3f73b58e3e77561b6a921"
     docker_tags:
       - "19.0"
+
+  - opencms: "10.5.4"
+    opencms_tag: "build_10_5_4"
+    base_image: "tomcat:8.5-jdk8@sha256:1eccf6ae2fc191c7046e3f79ec5946b7fad0ac3345bc4c7f27145705d80a891e"
+    opencms_sha256: "8326f3c811c6b20038eb37506ccbfbe3c52943a668d297dca36bad9dbd28d224"
+    docker_tags:
+      - "10.5.4"

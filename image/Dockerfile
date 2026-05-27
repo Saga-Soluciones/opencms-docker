@@ -10,6 +10,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TMPDIR=/tmp
 
 ARG OPENCMS_URL=https://github.com/alkacon/opencms-core/releases/download/build_21_0_1/opencms-21.0.1-distribution.zip
+ARG OPENCMS_VERSION=""
+ENV OPENCMS_VERSION=${OPENCMS_VERSION}
+ARG OPENCMS_SHA256=""
+ENV OPENCMS_SHA256=${OPENCMS_SHA256}
 
 ENV CONTAINER_BASE=/container \
     TOMCAT_HOME=/usr/local/tomcat \
@@ -53,7 +57,7 @@ RUN \
     echo "Update the apt packet repos" && \
     apt-get update && \
     echo "Install utils" && \
-    apt-get install -yq --no-install-recommends procps wget unzip xsltproc netcat-openbsd gosu && \
+    apt-get install -yq --no-install-recommends procps wget unzip xsltproc netcat-openbsd gosu default-mysql-client && \
     echo "Clean up apt" && \
     rm -rf /var/lib/apt/lists/* && \
     apt-get autoremove && \
@@ -82,4 +86,11 @@ RUN \
 # Expose port 8080 for Tomcat and define the startup script
 EXPOSE 8080
 WORKDIR $CONTAINER_BASE
+
+# Healthcheck: OpenCms login endpoint responds 200 once Tomcat+OpenCms are ready.
+# start-period gives the runtime install (CmsAutoSetup + module install) time to finish
+# on first boot without flipping the container to "unhealthy".
+HEALTHCHECK --interval=30s --timeout=10s --start-period=300s --retries=5 \
+    CMD wget -q --spider http://localhost:8080/opencms/system/login || exit 1
+
 CMD ["/root/opencms-run.sh"]
