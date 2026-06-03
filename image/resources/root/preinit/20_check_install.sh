@@ -1,4 +1,12 @@
 #!/bin/bash
+
+# Version gate state: only run the WAR refresh (config/modules/libs) when the
+# installed version differs from the image's OPENCMS_VERSION. On a plain
+# down/up of the same image the marker matches, so the update branch is skipped
+# and custom config (XSLT, project-config, runtime workplace edits) survives.
+STATE_DIR="/container/webapps/.opencms-state"
+VERSION_MARKER="${STATE_DIR}/installed-version"
+
 if [ ! -d ${ARTIFACTS_FOLDER}libs ]; then
     mkdir -v -p ${ARTIFACTS_FOLDER}libs
 fi
@@ -11,7 +19,12 @@ echo "$JAR_NAMES_PROPERTIES" > $JAR_NAMES_PROPERTIES_FILE
 
 if [ -f "${OPENCMS_HOME}/WEB-INF/config/opencms.properties" ] && grep -qE '^[[:space:]]*wizard\.enabled[[:space:]]*=[[:space:]]*false' "${OPENCMS_HOME}/WEB-INF/config/opencms.properties"
 then
-    echo "OpenCms already installed, updating modules and libs"
+    installed_version=""
+    [ -f "${VERSION_MARKER}" ] && installed_version="$(cat "${VERSION_MARKER}")"
+    if [ "${installed_version}" = "${OPENCMS_VERSION}" ]; then
+        echo "OpenCms already installed at version '${OPENCMS_VERSION}' (marker matches) — skipping WAR config/module/lib refresh, preserving custom config."
+    else
+    echo "OpenCms already installed (marker '${installed_version}' != image '${OPENCMS_VERSION}'), updating modules and libs"
 
     admin_passwd=$(get_secret ADMIN_PASSWD_FILE ADMIN_PASSWD)
     if [ ! -z "$admin_passwd" ]; then
@@ -70,6 +83,11 @@ then
 
     echo "Update modules core"
     bash /root/execute-opencms-shell.sh /config/update-core-modules.ocsh
+
+    mkdir -p "${STATE_DIR}"
+    printf '%s\n' "${OPENCMS_VERSION}" > "${VERSION_MARKER}"
+    echo "Updated version marker to '${OPENCMS_VERSION}'."
+    fi
 else
     echo "OpenCms not installed yet, running setup"
     if [ ! -d ${WEBAPPS_HOME} ]; then
@@ -132,6 +150,10 @@ else
     echo "Deleting no longer  used files"
     rm -rf ${OPENCMS_HOME}/setup
     rm -rf ${OPENCMS_HOME}/WEB-INF/packages/modules/*.zip
+
+    mkdir -p "${STATE_DIR}"
+    printf '%s\n' "${OPENCMS_VERSION}" > "${VERSION_MARKER}"
+    echo "Recorded install version marker '${OPENCMS_VERSION}'."
 fi
 
 echo "Deleting artifacts folder"
