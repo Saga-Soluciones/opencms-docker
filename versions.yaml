@@ -32,6 +32,13 @@ versions:
     docker_tags:
       - "19.0"
 
+  - opencms: "13.0"
+    opencms_tag: "build_13_0_0"
+    base_image: "tomcat:9.0-jdk11@sha256:8c7fab406fe1c0a359542df4077f9fd5d9624070f537d9483cba123d90cfea93"
+    opencms_sha256: "2d8e5b9772390ec2578f5c85136fa2ad054b02c2e13e61020b2c55a9e3305669"
+    docker_tags:
+      - "13.0"
+
   - opencms: "10.5.4"
     opencms_tag: "build_10_5_4"
     base_image: "tomcat:8.5-jdk8@sha256:1eccf6ae2fc191c7046e3f79ec5946b7fad0ac3345bc4c7f27145705d80a891e"
