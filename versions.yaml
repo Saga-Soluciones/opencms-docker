@@ -39,6 +39,13 @@ versions:
     docker_tags:
       - "18.0"
 
+  - opencms: "16.0"
+    opencms_tag: "build_16_0_0"
+    base_image: "tomcat:9.0-jdk11@sha256:8c7fab406fe1c0a359542df4077f9fd5d9624070f537d9483cba123d90cfea93"
+    opencms_sha256: "db66b529b03d4119f8629bd03cd5f2d47ebb46a68741de4f7c597889b6aac028"
+    docker_tags:
+      - "16.0"
+
   - opencms: "14.0"
     opencms_tag: "build_14_0_0"
     base_image: "tomcat:9.0-jdk11@sha256:8c7fab406fe1c0a359542df4077f9fd5d9624070f537d9483cba123d90cfea93"
